@@ -9,6 +9,7 @@
 <title>中国宏观经济监测 — 实时数据与政策追踪</title>
 <meta name="description" content="中国宏观经济数据监测平台，涵盖GDP、CPI、PMI、社融等核心指标与政策要闻实时更新">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="data/data.js"></script>
 <style>
 :root {
   --bg: #f0f2f5;
@@ -217,36 +218,18 @@ let activeCategory = 'all';
 let sortAsc = false;
 let charts = {};
 
-async function loadData() {
+function loadData() {
   try {
-    const [indResp, tlResp] = await Promise.all([
-      fetch('data/indicators.json?v=' + Date.now()),
-      fetch('data/timeline.json?v=' + Date.now())
-    ]);
-    indicatorsData = await indResp.json();
-    timelineData = await tlResp.json();
+    if (typeof __INDICATORS__ === 'undefined' || typeof __TIMELINE__ === 'undefined') {
+      throw new Error('inline data not loaded');
+    }
+    indicatorsData = __INDICATORS__;
+    timelineData = __TIMELINE__;
     renderAll();
   } catch(e) {
     console.error('Data load error:', e);
-    // Try once more after 2s (common CDN propagation delay)
-    setTimeout(async () => {
-      try {
-        const [ir, tr] = await Promise.all([
-          fetch('data/indicators.json?v=2'),
-          fetch('data/timeline.json?v=2')
-        ]);
-        if (!ir.ok || !tr.ok) throw new Error('retry fetch failed');
-        indicatorsData = await ir.json();
-        timelineData = await tr.json();
-        renderAll();
-      } catch(e2) {
-        document.getElementById('timelineFeed').innerHTML =
-          '<div class="empty-state"><div class="empty-icon">⚠️</div><p>数据加载失败，请 <a href="javascript:location.reload(true)">强制刷新</a> (Ctrl+Shift+R)</p></div>';
-      }
-    }, 2000);
-    // Show loading state during retry
     document.getElementById('timelineFeed').innerHTML =
-      '<div class="loading"><div class="loading-spinner"></div><p>正在重试加载...</p></div>';
+      '<div class="empty-state"><div class="empty-icon">⚠️</div><p>数据加载失败: ' + e.message + '</p></div>';
   }
 }
 
