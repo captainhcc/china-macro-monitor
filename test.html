@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><meta http-equiv="Cache-Control" content="no-cache"><title>数据测试</title></head><body>
+<h2>数据加载测试</h2>
+<pre id="result">加载中...</pre>
+<script>
+(async () => {
+  try {
+    const r1 = await fetch('data/indicators.json');
+    const r2 = await fetch('data/timeline.json');
+    const d1 = await r1.json();
+    const d2 = await r2.json();
+    document.getElementById('result').textContent =
+      '✅ 加载成功!\n\n上证指数: ' + d1.dashboard.indices[0].value +
+      '\n最新更新: ' + d1.lastUpdate +
+      '\n新闻条目数: ' + d2.timeline.reduce((s,d)=>s+d.entries.length,0);
+  } catch(e) {
+    document.getElementById('result').textContent = '❌ 加载失败: ' + e.message;
+  }
+})();
+</script></body></html>
