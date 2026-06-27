@@ -856,8 +856,8 @@ def publish_to_github():
         print("     git init && git remote add origin git@github.com:captainhcc/china-macro-monitor.git")
         return
 
-    # 确保 data/ 文件被跟踪
-    git("git add data/ index.html wechat-summary.html")
+    # 确保 data/ 文件被跟踪（-f 绕过 .gitignore）
+    git("git add -f data/ index.html wechat-summary.html")
 
     # 提交
     commit_msg = f"data: auto update {NOW.strftime('%Y-%m-%d %H:%M')}"
