@@ -17,6 +17,10 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Windows 终端 UTF-8 编码修复
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # ── 依赖检查 ──────────────────────────────────────────
 try:
     import requests
@@ -690,6 +694,17 @@ def _safe_json_dumps(obj):
 # ═══════════════════════════════════════════════════════
 
 def main():
+    """主流程：采集数据并生成文件"""
+    import argparse
+    parser = argparse.ArgumentParser(description="中国宏观经济监测 - 数据更新脚本")
+    parser.add_argument("--publish", action="store_true", help="数据更新后自动推送到 GitHub Pages")
+    parser.add_argument("--publish-only", action="store_true", help="仅推送现有数据到 GitHub（不重新采集）")
+    args = parser.parse_args()
+
+    if args.publish_only:
+        publish_to_github()
+        return
+
     print("=" * 60)
     print("  中国宏观经济监测 — Python 数据更新脚本")
     print(f"  运行时间: {NOW.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -802,6 +817,80 @@ def main():
     print(f"  📰 新闻条目: {total_entries} 条")
     print("=" * 60)
     print("\n提示: 在浏览器中打开 index.html 即可查看数据面板")
+
+    # ── 发布到 GitHub Pages ──
+    if args.publish:
+        publish_to_github()
+
+
+def publish_to_github():
+    """将当前数据推送到 GitHub，触发 Pages 部署"""
+    import subprocess
+
+    print("\n" + "─" * 40)
+    print("第六步: 发布到 GitHub Pages")
+    print("─" * 40)
+
+    # SSH key 路径
+    ssh_key = os.path.expanduser("~/.ssh/id_ed25519_macro")
+    if not os.path.exists(ssh_key):
+        print("  ⚠️ SSH key 未找到，跳过发布")
+        print(f"  请确保 {ssh_key} 存在")
+        return
+
+    git_env = os.environ.copy()
+    git_env["GIT_SSH_COMMAND"] = f"ssh -i {ssh_key} -o StrictHostKeyChecking=yes"
+
+    def git(cmd):
+        result = subprocess.run(
+            cmd, shell=True, cwd=git_repo_root, capture_output=True, text=True,
+            env=git_env
+        )
+        if result.returncode != 0:
+            print(f"  ⚠️ git {cmd.split()[0]} 失败: {result.stderr.strip()}")
+        return result
+
+    # 验证 git 可用并找到仓库根目录
+    git_repo_root = subprocess.run(
+        "git rev-parse --show-toplevel",
+        shell=True, cwd=BASE_DIR, capture_output=True, text=True, env=git_env
+    ).stdout.strip()
+    if not git_repo_root:
+        print("  ❌ 当前目录不在 git 仓库中")
+        print("     请确保 py-version/ 位于 china-macro-monitor 仓库内")
+        return
+    print(f"  ✓ Git 仓库: {git_repo_root}")
+
+    # 确保 data/ 文件被跟踪（-f 绕过 .gitignore）
+    git("git add -f data/ index.html wechat-summary.html")
+
+    # 提交
+    commit_msg = f"data: auto update {NOW.strftime('%Y-%m-%d %H:%M')}"
+    result = git(f'git commit -m "{commit_msg}"')
+
+    # Push 到独立分支 py-standalone
+    print("  📤 推送到 GitHub (py-standalone 分支)...")
+    push_result = git("git push origin main:py-standalone 2>&1")
+
+    if push_result.returncode == 0:
+        # 推导 Pages URL
+        try:
+            remote_url = subprocess.run(
+                "git remote get-url origin", shell=True, cwd=git_repo_root,
+                capture_output=True, text=True, env=git_env
+            ).stdout.strip()
+            # git@github.com:captainhcc/china-macro-monitor.git → captainhcc/china-macro-monitor
+            repo_path = remote_url.replace("git@github.com:", "").replace(".git", "").replace("https://github.com/", "")
+            user, repo = repo_path.split("/")
+            pages_url = f"https://{user}.github.io/{repo}/"
+        except Exception:
+            pages_url = "https://captainhcc.github.io/china-macro-monitor/"
+
+        print(f"\n  ✅ 发布成功！")
+        print(f"  🔗 客户访问: {pages_url}")
+        print(f"     ⚠️ 需在 GitHub Pages 设置中将分支选为 py-standalone")
+    else:
+        print("  ⚠️ 推送失败，检查网络或 SSH key")
 
 
 if __name__ == "__main__":
