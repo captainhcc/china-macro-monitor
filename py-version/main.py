@@ -17,6 +17,10 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Windows 终端 UTF-8 编码修复
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # ── 依赖检查 ──────────────────────────────────────────
 try:
     import requests
