@@ -843,21 +843,26 @@ def publish_to_github():
 
     def git(cmd):
         result = subprocess.run(
-            cmd, shell=True, cwd=BASE_DIR, capture_output=True, text=True,
+            cmd, shell=True, cwd=git_repo_root, capture_output=True, text=True,
             env=git_env
         )
         if result.returncode != 0:
             print(f"  ⚠️ git {cmd.split()[0]} 失败: {result.stderr.strip()}")
         return result
 
-    # 确保是 git 仓库
-    if not (BASE_DIR / ".git").exists():
-        print("  ❌ 不是 git 仓库，请先执行:")
-        print("     git init && git remote add origin git@github.com:captainhcc/china-macro-monitor.git")
+    # 验证 git 可用并找到仓库根目录
+    git_repo_root = subprocess.run(
+        "git rev-parse --show-toplevel",
+        shell=True, cwd=BASE_DIR, capture_output=True, text=True, env=git_env
+    ).stdout.strip()
+    if not git_repo_root:
+        print("  ❌ 当前目录不在 git 仓库中")
+        print("     请确保 py-version/ 位于 china-macro-monitor 仓库内")
         return
+    print(f"  ✓ Git 仓库: {git_repo_root}")
 
     # 确保 data/ 文件被跟踪（-f 绕过 .gitignore）
-    git("git add -f data/ index.html wechat-summary.html")
+    git("git add -f py-version/data/ py-version/index.html py-version/wechat-summary.html")
 
     # 提交
     commit_msg = f"data: auto update {NOW.strftime('%Y-%m-%d %H:%M')}"
@@ -871,7 +876,7 @@ def publish_to_github():
         # 推导 Pages URL
         try:
             remote_url = subprocess.run(
-                "git remote get-url origin", shell=True, cwd=BASE_DIR,
+                "git remote get-url origin", shell=True, cwd=git_repo_root,
                 capture_output=True, text=True, env=git_env
             ).stdout.strip()
             # git@github.com:captainhcc/china-macro-monitor.git → captainhcc/china-macro-monitor
